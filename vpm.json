@@ -1,0 +1,29 @@
+{
+  "name": "MoleTool",
+  "id": "net.nfya.moletool",
+  "url": "https://nfya-lab.github.io/MoleTool/vpm.json",
+  "author": "nfya",
+  "packages": {
+    "net.nfya.moletool": {
+      "versions": {
+        "1.0.0": {
+          "name": "net.nfya.moletool",
+          "version": "1.0.0",
+          "displayName": "MoleTool",
+          "description": "",
+          "unity": "2022.3",
+          "author": {
+            "name": "nfya",
+            "url": "https://github.com/nfya-lab"
+          },
+          "vpmDependencies": {
+          },
+          "url": "https://github.com/nfya-lab/MoleTool/releases/download/v1.0.0/net.nfya.moletool-1.0.0.zip"
+        }
+      }
+    }
+  },
+  "versions": {
+    "net.nfya.moletool": ["1.0.0"]
+  }
+}

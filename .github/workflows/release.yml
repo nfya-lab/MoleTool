@@ -1,0 +1,119 @@
+﻿# スタンドアロン VPM パッケージ用 Release ワークフロー
+# コミットメッセージが "Release " で始まる push で発火
+# vpm.json を自動更新し GitHub Pages にデプロイ
+
+name: Create Release and Update VPM
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  release:
+    if: startsWith(github.event.head_commit.message, 'Release ')
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Get package info
+      id: package
+      run: |
+        PACKAGE_NAME=$(jq -r '.name' package.json)
+        VERSION=$(jq -r '.version' package.json)
+        echo "name=${PACKAGE_NAME}" >> $GITHUB_OUTPUT
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+    - name: Check if tag exists
+      id: check_tag
+      run: |
+        if git rev-parse "v${{ steps.package.outputs.version }}" >/dev/null 2>&1; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Create and push tag
+      if: steps.check_tag.outputs.exists == 'false'
+      run: |
+        git tag "v${{ steps.package.outputs.version }}"
+        git push origin "v${{ steps.package.outputs.version }}"
+
+    - name: Create UPM branch
+      run: |
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+        git checkout -b upm
+        git push origin upm --force
+        git checkout main || git checkout master
+
+    - name: Create package zip
+      run: |
+        mkdir -p package-temp
+        rsync -av --exclude='.git' --exclude='.github' --exclude='package-temp' --exclude='vpm.json' --exclude='index.html' . package-temp/
+        cd package-temp
+        zip -r "../${{ steps.package.outputs.name }}-${{ steps.package.outputs.version }}.zip" .
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ steps.package.outputs.version }}
+        name: v${{ steps.package.outputs.version }}
+        body: |
+          ## ${{ steps.package.outputs.name }} v${{ steps.package.outputs.version }}
+
+          **VRChat Creator Companion でインストール:**
+          1. VCC にリポジトリを追加: Pages URL の vpm.json
+          2. パッケージ一覧から ${{ steps.package.outputs.name }} をインストール
+        files: ${{ steps.package.outputs.name }}-${{ steps.package.outputs.version }}.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Update vpm.json
+      run: |
+        PACKAGE_NAME="${{ steps.package.outputs.name }}"
+        VERSION="${{ steps.package.outputs.version }}"
+        REPO_URL="https://github.com/${{ github.repository }}"
+        ZIP_URL="$REPO_URL/releases/download/v$VERSION/$PACKAGE_NAME-$VERSION.zip"
+
+        PACKAGE_ENTRY=$(jq --arg url "$ZIP_URL" '. + {"url": $url}' package.json)
+
+        if [ -f vpm.json ]; then
+          jq --arg pkg "$PACKAGE_NAME" --arg ver "$VERSION" --argjson entry "$PACKAGE_ENTRY" \
+            '(.packages[$pkg].versions[$ver] = $entry) | (.versions[$pkg] = (.versions[$pkg] // [] | if index($ver) then . else . + [$ver] end))' \
+            vpm.json > vpm_tmp.json
+          mv vpm_tmp.json vpm.json
+        fi
+
+    - name: Commit vpm.json
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add vpm.json
+        git diff --staged --quiet || git commit -m "Update vpm.json for v${{ steps.package.outputs.version }}"
+        git push
+
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: '.'
+
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
