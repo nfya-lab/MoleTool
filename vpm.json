@@ -16,14 +16,15 @@
             "name": "nfya",
             "url": "https://github.com/nfya-lab"
           },
-          "vpmDependencies": {
-          },
+          "vpmDependencies": {},
           "url": "https://github.com/nfya-lab/MoleTool/releases/download/v1.0.0/net.nfya.moletool-1.0.0.zip"
         }
       }
     }
   },
   "versions": {
-    "net.nfya.moletool": ["1.0.0"]
+    "net.nfya.moletool": [
+      "1.0.0"
+    ]
   }
 }
